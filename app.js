@@ -14,6 +14,7 @@ import { config } from "./server/config.js";
 import { mountRails } from "./server/index.js";
 import { mountScout } from "./agents/scout-server.js";
 import { mountMcp } from "./mcp/server.js";
+import { mountDemo } from "./server/demo.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -24,6 +25,7 @@ app.use(express.static(path.join(__dirname, "public")));
 mountRails(app);
 mountScout(app);
 mountMcp(app);
+mountDemo(app);
 
 app.listen(config.port, () => {
   console.log(`MatchMesh listening on :${config.port} (rails + scout + mcp, ${config.network})`);

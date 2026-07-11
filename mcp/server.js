@@ -22,33 +22,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createInjectiveClient, parsePaymentResponseHeader } from "@injectivelabs/x402/client";
 import { PRICE } from "../server/index.js";
+import { checkBudget } from "./budget-guard.js";
 
 const RAILS_URL = process.env.MATCHMESH_URL || `http://localhost:${process.env.PORT || 4021}`;
 
-/**
- * The MCP endpoint is public and pays on the caller's behalf with zero cost to
- * them — without a cap, anyone who finds the URL could spam tool calls and
- * drain the operator wallet for free. This bounds worst-case damage to a small
- * daily budget instead of the wallet's entire balance. In-memory / resets on
- * restart is an intentional, disclosed limitation for a hackathon deployment,
- * not a production guarantee.
- */
-const DAILY_BUDGET_UNITS = BigInt(Math.round(Number(process.env.MCP_DAILY_BUDGET_USD || 2) * 1e6));
-let spentToday = 0n;
-let budgetWindowStart = Date.now();
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function checkBudget(costUnits) {
-  if (Date.now() - budgetWindowStart > DAY_MS) {
-    spentToday = 0n;
-    budgetWindowStart = Date.now();
-  }
-  if (spentToday + costUnits > DAILY_BUDGET_UNITS) {
-    const remaining = Number(DAILY_BUDGET_UNITS - spentToday) / 1e6;
-    throw new Error(`MCP daily spend cap reached (remaining budget: $${remaining.toFixed(4)}). This guards the shared operator wallet against abuse — try again after the daily window resets, or call the x402 rails directly with your own funded wallet instead.`);
-  }
-  spentToday += costUnits;
-}
+// Budget guard is shared with /demo/ask (server/demo.js) since both pay from
+// the same operator wallet — see mcp/budget-guard.js.
 
 function buildOperatorClient() {
   return createInjectiveClient({
