@@ -60,6 +60,15 @@ skills/matchmesh/SKILL.md
 
 Follows the exact same frontmatter/structure convention as `InjectiveLabs/agent-skills` — installable the same way other Injective skills are.
 
+## 7. Confirm USDC CCTP is real, not just documented
+
+`scripts/cctp-bridge.js` does a real burn-and-mint via Circle's actual TokenMessengerV2/MessageTransmitterV2 contracts (same deterministic addresses on every EVM CCTP domain) and the real Iris attestation API — not a testnet-faucet mint dressed up as "cross-chain." Proven live:
+
+- Burn on Sepolia: https://sepolia.etherscan.io/tx/0xd648a476aaa92a479aab5eba91d8e20d9648057c63ca2ccd43d7b9d037e0aeac
+- Mint on Injective testnet: https://testnet.blockscout.injective.network/tx/0x5448ee1f0dde1a94cb8cc377abff7b60cd8c730d06786dc043db255d49ab0053
+
+Run it yourself with `npm run cctp -- <amount>` given a Sepolia-funded key.
+
 ## Full local run (optional — only needed to run your own agents, not to verify the deployment)
 
 ```bash

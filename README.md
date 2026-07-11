@@ -15,7 +15,7 @@ Built for the [Injective Global Cup](https://www.hackquest.io/hackathons/The-Inj
 | `pay_per_query`, `send_tip`, `join_pool`, `buy_pass` rails | `@injectivelabs/x402` — real x402 payments on Injective EVM |
 | MCP tool surface (`ask_worldcup_stat`, `send_cheer`, `join_goal_pool`, `buy_fan_pass`) | MCP Server — any MCP-compatible agent can use the rails with zero wallet setup |
 | `skills/matchmesh/SKILL.md` | Agent Skills — installable via `npx skills add <repo> --skill matchmesh`, same convention as `InjectiveLabs/agent-skills` |
-| Cross-chain funding path (testnet USDC via Circle faucet + CCTP contracts) | USDC CCTP |
+| `scripts/cctp-bridge.js` | USDC CCTP — real burn-and-mint via Circle's actual TokenMessengerV2/MessageTransmitterV2, Sepolia → Injective testnet. Proven live: [burn](https://sepolia.etherscan.io/tx/0xd648a476aaa92a479aab5eba91d8e20d9648057c63ca2ccd43d7b9d037e0aeac) / [mint](https://testnet.blockscout.injective.network/tx/0x5448ee1f0dde1a94cb8cc377abff7b60cd8c730d06786dc043db255d49ab0053) |
 | Scout microservice paid by other agents, not humans | Agent-to-agent commerce, not just human-to-agent |
 | `npm run verify` | On-chain proof — don't trust the numbers, re-derive them |
 
