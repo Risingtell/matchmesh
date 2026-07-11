@@ -50,6 +50,21 @@ export const store = {
     if (state.pools[matchId]) state.pools[matchId].payoutTxHash = payoutTxHash;
     persist();
   },
+  /**
+   * Synchronously claims the right to pay out a pool, before any await runs.
+   * Node's single-threaded event loop means this can't interleave with another
+   * request's claim — the second concurrent caller always sees "processing" or
+   * "paid" and bails, closing the double-pay race in the trigger-payout route.
+   */
+  claimPoolForPayout(matchId) {
+    const pool = state.pools[matchId];
+    if (!pool || pool.members.length === 0) return { ok: false, reason: "no members" };
+    if (pool.payoutTxHash === "processing") return { ok: false, reason: "already processing" };
+    if (pool.payoutTxHash) return { ok: false, reason: "already paid", payoutTxHash: pool.payoutTxHash };
+    pool.payoutTxHash = "processing";
+    persist();
+    return { ok: true, pool };
+  },
   addPass(passId, tier, buyer, expiresAt) {
     state.passes[passId] = { tier, buyer, issuedAt: new Date().toISOString(), expiresAt };
     persist();

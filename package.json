@@ -13,7 +13,8 @@
     "mcp": "node mcp/server.js",
     "genkeys": "node scripts/genkeys.js",
     "verify": "node scripts/verify.js",
-    "balances": "node scripts/check-balances.js"
+    "balances": "node scripts/check-balances.js",
+    "cctp": "node scripts/cctp-bridge.js"
   },
   "keywords": ["x402", "injective", "mcp", "agent-skills", "world-cup"],
   "author": "",

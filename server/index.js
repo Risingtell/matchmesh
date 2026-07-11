@@ -119,20 +119,34 @@ export function mountRails(app) {
     if (req.headers["x-internal-secret"] !== config.internalSecret) {
       return res.status(403).json({ error: "forbidden" });
     }
-    const pool = store.getPool(req.params.matchId);
-    if (!pool || pool.members.length === 0) return res.status(404).json({ error: "no pool members" });
-    if (pool.payoutTxHash) return res.json({ ok: true, alreadyPaid: pool.payoutTxHash });
-
-    const total = pool.members.reduce((sum, m) => sum + m.amountUnits, 0);
-    const share = Math.floor(total / pool.members.length);
-    const results = [];
-    for (const member of pool.members) {
-      const { hash } = await payoutUsdc(member.address, BigInt(share));
-      results.push({ to: member.address, amount: share, hash });
+    // Synchronous claim BEFORE any await closes the double-pay race: a second
+    // concurrent call for the same matchId sees "processing"/"already paid"
+    // and bails, instead of both callers reading payoutTxHash:null and both
+    // running the payout loop.
+    const claim = store.claimPoolForPayout(req.params.matchId);
+    if (!claim.ok) {
+      if (claim.reason === "no members") return res.status(404).json({ error: "no pool members" });
+      return res.json({ ok: true, alreadyPaid: claim.payoutTxHash ?? "in progress" });
     }
-    store.markPoolPaid(req.params.matchId, results[0]?.hash || null);
-    store.recordSettlement({ kind: "pool_payout", payer: "treasury", amount: String(total), txHash: results[0]?.hash || null, network: config.network, meta: { matchId: req.params.matchId, results } });
-    res.json({ ok: true, results });
+    const pool = claim.pool;
+
+    try {
+      const total = pool.members.reduce((sum, m) => sum + m.amountUnits, 0);
+      const share = Math.floor(total / pool.members.length);
+      const results = [];
+      for (const member of pool.members) {
+        const { hash } = await payoutUsdc(member.address, BigInt(share));
+        results.push({ to: member.address, amount: share, hash });
+      }
+      store.markPoolPaid(req.params.matchId, results[0]?.hash || null);
+      store.recordSettlement({ kind: "pool_payout", payer: "treasury", amount: String(total), txHash: results[0]?.hash || null, network: config.network, meta: { matchId: req.params.matchId, results } });
+      res.json({ ok: true, results });
+    } catch (err) {
+      // Release the claim on failure so a retry is possible instead of the
+      // pool being stuck "processing" forever after a transient chain error.
+      store.markPoolPaid(req.params.matchId, null);
+      res.status(500).json({ error: "payout_failed", message: err.message });
+    }
   });
 }
 

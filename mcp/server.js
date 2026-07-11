@@ -21,8 +21,34 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createInjectiveClient, parsePaymentResponseHeader } from "@injectivelabs/x402/client";
+import { PRICE } from "../server/index.js";
 
 const RAILS_URL = process.env.MATCHMESH_URL || `http://localhost:${process.env.PORT || 4021}`;
+
+/**
+ * The MCP endpoint is public and pays on the caller's behalf with zero cost to
+ * them — without a cap, anyone who finds the URL could spam tool calls and
+ * drain the operator wallet for free. This bounds worst-case damage to a small
+ * daily budget instead of the wallet's entire balance. In-memory / resets on
+ * restart is an intentional, disclosed limitation for a hackathon deployment,
+ * not a production guarantee.
+ */
+const DAILY_BUDGET_UNITS = BigInt(Math.round(Number(process.env.MCP_DAILY_BUDGET_USD || 2) * 1e6));
+let spentToday = 0n;
+let budgetWindowStart = Date.now();
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function checkBudget(costUnits) {
+  if (Date.now() - budgetWindowStart > DAY_MS) {
+    spentToday = 0n;
+    budgetWindowStart = Date.now();
+  }
+  if (spentToday + costUnits > DAILY_BUDGET_UNITS) {
+    const remaining = Number(DAILY_BUDGET_UNITS - spentToday) / 1e6;
+    throw new Error(`MCP daily spend cap reached (remaining budget: $${remaining.toFixed(4)}). This guards the shared operator wallet against abuse — try again after the daily window resets, or call the x402 rails directly with your own funded wallet instead.`);
+  }
+  spentToday += costUnits;
+}
 
 function buildOperatorClient() {
   return createInjectiveClient({
@@ -32,7 +58,8 @@ function buildOperatorClient() {
   });
 }
 
-async function payRails(operatorClient, path, body) {
+async function payRails(operatorClient, path, body, costUnits) {
+  checkBudget(costUnits);
   const res = await operatorClient.fetch(`${RAILS_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -59,7 +86,7 @@ function buildServer(operatorClient) {
       inputSchema: { question: z.string().describe("e.g. 'how did Mexico do?' or 'what's the live score of Canada?'") },
     },
     async ({ question }) => {
-      const { data, receipt } = await payRails(operatorClient, "/api/pay_per_query", { question });
+      const { data, receipt } = await payRails(operatorClient, "/api/pay_per_query", { question }, BigInt(PRICE.query));
       return textResult({ answer: data.answer, settledTx: receipt?.transaction ?? null });
     }
   );
@@ -72,7 +99,7 @@ function buildServer(operatorClient) {
       inputSchema: { team: z.string().describe("Team name, e.g. 'Mexico'") },
     },
     async ({ team }) => {
-      const { data, receipt } = await payRails(operatorClient, "/api/send_tip", { team });
+      const { data, receipt } = await payRails(operatorClient, "/api/send_tip", { team }, BigInt(PRICE.tip));
       return textResult({ team: data.team, totalCheerUnits: data.totalCheerUnits, settledTx: receipt?.transaction ?? null });
     }
   );
@@ -89,7 +116,7 @@ function buildServer(operatorClient) {
       },
     },
     async ({ matchId, team, payoutAddress }) => {
-      const { data, receipt } = await payRails(operatorClient, "/api/join_pool", { matchId, team, payoutAddress });
+      const { data, receipt } = await payRails(operatorClient, "/api/join_pool", { matchId, team, payoutAddress }, BigInt(PRICE.pool));
       return textResult({ pool: data.pool, settledTx: receipt?.transaction ?? null });
     }
   );
@@ -102,7 +129,7 @@ function buildServer(operatorClient) {
       inputSchema: { tier: z.string().optional().describe("Pass tier, defaults to 'standard'") },
     },
     async ({ tier }) => {
-      const { data, receipt } = await payRails(operatorClient, "/api/buy_pass", { tier });
+      const { data, receipt } = await payRails(operatorClient, "/api/buy_pass", { tier }, BigInt(PRICE.pass));
       return textResult({ passId: data.passId, expiresAt: data.expiresAt, settledTx: receipt?.transaction ?? null });
     }
   );

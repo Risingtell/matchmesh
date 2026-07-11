@@ -26,6 +26,7 @@ function loadKeys() {
 
 async function getAllTransferLogs(fromBlock, toBlock) {
   const logs = [];
+  const failedChunks = [];
   let start = fromBlock;
   while (start <= toBlock) {
     const end = start + CHUNK_BLOCKS - 1n > toBlock ? toBlock : start + CHUNK_BLOCKS - 1n;
@@ -39,10 +40,11 @@ async function getAllTransferLogs(fromBlock, toBlock) {
       logs.push(...chunk);
     } catch (err) {
       console.error(`  getLogs(${start}-${end}) failed: ${err.shortMessage || err.message}`);
+      failedChunks.push({ start, end });
     }
     start = end + 1n;
   }
-  return logs;
+  return { logs, failedChunks };
 }
 
 async function main() {
@@ -59,8 +61,11 @@ async function main() {
   const fromBlock = latest > genesisWindow ? latest - genesisWindow : 0n;
 
   console.log(`Scanning blocks ${fromBlock} -> ${latest} ...`);
-  const logs = await getAllTransferLogs(fromBlock, latest);
+  const { logs, failedChunks } = await getAllTransferLogs(fromBlock, latest);
   console.log(`Found ${logs.length} total USDC Transfer events in range.`);
+  if (failedChunks.length > 0) {
+    console.log(`\n*** WARNING: ${failedChunks.length} block range(s) could not be scanned (RPC errors above) — the numbers below may UNDERCOUNT real settlements. Re-run to retry the missing ranges. ***\n`);
+  }
 
   const addrToRole = Object.fromEntries(Object.entries(wallets).map(([role, addr]) => [addr, role]));
   const relevant = logs.filter((l) => addrToRole[l.args.from?.toLowerCase()] || addrToRole[l.args.to?.toLowerCase()]);
@@ -69,8 +74,8 @@ async function main() {
   let totalOut = 0n;
   const perWallet = {};
   for (const log of relevant) {
-    const from = log.args.from.toLowerCase();
-    const to = log.args.to.toLowerCase();
+    const from = log.args.from?.toLowerCase();
+    const to = log.args.to?.toLowerCase();
     const value = log.args.value;
     if (addrToRole[to]) {
       perWallet[addrToRole[to]] = perWallet[addrToRole[to]] || { in: 0n, out: 0n };
@@ -95,7 +100,11 @@ async function main() {
   if (existsSync(ledgerPath)) {
     const ledger = JSON.parse(readFileSync(ledgerPath, "utf8"));
     console.log(`\nApp's own ledger claims ${ledger.settlements.length} settlements.`);
-    console.log(relevant.length >= ledger.settlements.length ? "OK: chain confirms at least as many transfers as the app claims." : "WARNING: app claims MORE settlements than the chain shows — investigate.");
+    if (relevant.length >= ledger.settlements.length) {
+      console.log(failedChunks.length > 0 ? "OK (but scan was incomplete — see warning above, re-run for a fully authoritative count)." : "OK: chain confirms at least as many transfers as the app claims.");
+    } else {
+      console.log("WARNING: app claims MORE settlements than the chain shows — investigate.");
+    }
   } else {
     console.log("\nNo local ledger.json found yet (server hasn't recorded any settlements) — chain-only numbers above are authoritative.");
   }
