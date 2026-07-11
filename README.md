@@ -4,9 +4,9 @@
 
 Built for the [Injective Global Cup](https://www.hackquest.io/hackathons/The-Injective-Global-Cup) (HackQuest). Instead of shipping one more World Cup app, MatchMesh is the *rails* — a shared MCP + x402 settlement layer any World Cup app or agent can plug into — proven live with three real agents running on top of its own rails, against the actual 2026 tournament in progress right now.
 
-**Live demo:** _fill in deployed URL_
+**Live demo:** https://matchmesh.onrender.com
 **Video:** _fill in demo video link_
-**Verify it's real:** `npm run verify` — re-derives every settlement straight from Injective testnet USDC Transfer logs, independent of this app's own database.
+**Verify it's real:** `npm run verify` — re-derives every settlement straight from Injective testnet USDC Transfer logs, independent of this app's own database. This is the authoritative proof; the live site's `/api/impact` dashboard reflects its own local ledger and resets on redeploy (Render free-tier disk is ephemeral), but the on-chain settlements themselves are permanent and don't depend on that ledger surviving.
 
 ## Capability map
 
@@ -49,12 +49,14 @@ All three run against **real, live 2026 World Cup data** (worldcup26.ir — veri
 npm install
 npm run genkeys      # generates treasury + 4 agent wallets (gitignored)
 node scripts/build-env.js   # writes .env from the generated keys
-# fund every printed address: faucet.circle.com (testnet USDC, Injective Testnet)
-#                              testnet.faucet.injective.network (INJ gas)
+# fund: faucet.circle.com (testnet USDC, Injective Testnet) for treasury/agent-scout (gas)
+#       + agent-statcaster/mcp-operator (USDC) — see JUDGE-QUICKSTART.md for exactly which wallet needs what
 
-npm run server        # rails on :4021
-npm run mcp            # MCP server on :4023/mcp
-node agents/scout-server.js   # Scout's own paid microservice on :4022
+npm start              # everything on one port: rails + Scout + MCP + dashboard (:4021, or $PORT)
+# or run them separately for local dev:
+#   npm run server        # rails on :4021
+#   npm run mcp            # MCP server on :4023/mcp
+#   node agents/scout-server.js   # Scout's own paid microservice on :4022
 
 npm run agent:statcaster -- "how did Mexico do?"
 node agents/scout.js Mexico
@@ -62,7 +64,10 @@ npm run agent:tipper           # watches live scores continuously
 node agents/tipper.js --once   # single poll cycle, good for a demo/CI run
 
 npm run verify         # on-chain proof, independent of the app's own database
+npm run balances       # check every wallet's INJ/USDC balance
 ```
+
+Deploys as a single Render web service (see `render.yaml`) — `npm start` runs `app.js`, which mounts the rails, Scout, and MCP server on one Express app/port and serves the landing page + live dashboard from `public/`.
 
 ## Tech
 
