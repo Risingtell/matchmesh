@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.local
+keys/
+*.pem
+*.dat
+server/.data/
+docs/SUBMISSION.md
+docs/VIDEO_SCRIPT.md
+docs/WHATSAPP.md
+*.log

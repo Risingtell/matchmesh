@@ -1,0 +1,30 @@
+{
+  "name": "matchmesh",
+  "version": "1.0.0",
+  "description": "Agent-commerce settlement layer for World Cup apps on Injective (Injective Global Cup hackathon)",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node app.js",
+    "server": "node server/index.js",
+    "agent:statcaster": "node agents/statcaster.js",
+    "agent:scout": "node agents/scout.js",
+    "agent:tipper": "node agents/tipper.js",
+    "mcp": "node mcp/server.js",
+    "genkeys": "node scripts/genkeys.js",
+    "verify": "node scripts/verify.js",
+    "balances": "node scripts/check-balances.js"
+  },
+  "keywords": ["x402", "injective", "mcp", "agent-skills", "world-cup"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@injectivelabs/x402": "^0.0.1",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "viem": "^2.39.3",
+    "zod": "^3.23.8"
+  }
+}
+

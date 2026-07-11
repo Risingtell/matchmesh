@@ -1,0 +1,44 @@
+# Render blueprint — deploys MatchMesh as a persistent web service (needed for
+# the file-backed settlement ledger and the long-running facilitator wallets;
+# a serverless function's ephemeral filesystem would break the ledger).
+# Connect this repo in Render, it reads this file. Set the secret env vars in
+# the dashboard (never commit them).
+services:
+  - type: web
+    name: matchmesh
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NETWORK
+        value: eip155:1439
+      - key: RPC_URL
+        value: https://testnet.evm.archival.chain.virtual.json-rpc.injective.network
+      - key: USDC_ADDRESS
+        value: "0x0C382e685bbeeFE5d3d9C29e29E341fEE8E84C5d"
+      - key: TREASURY_PRIVATE_KEY
+        sync: false
+      - key: TREASURY_ADDRESS
+        sync: false
+      - key: INTERNAL_SECRET
+        sync: false
+      - key: STATCASTER_PRIVATE_KEY
+        sync: false
+      - key: STATCASTER_ADDRESS
+        sync: false
+      - key: SCOUT_PRIVATE_KEY
+        sync: false
+      - key: SCOUT_ADDRESS
+        sync: false
+      - key: TIPPER_PRIVATE_KEY
+        sync: false
+      - key: TIPPER_ADDRESS
+        sync: false
+      - key: MCP_OPERATOR_PRIVATE_KEY
+        sync: false
+      - key: MCP_OPERATOR_ADDRESS
+        sync: false

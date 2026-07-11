@@ -1,0 +1,67 @@
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+
+const DATA_DIR = new URL("./.data/", import.meta.url);
+const DATA_FILE = new URL("./ledger.json", DATA_DIR);
+
+function empty() {
+  return {
+    settlements: [],   // {id, kind, payer, amount, txHash, network, at, meta}
+    cheers: {},        // team -> total USDC units
+    pools: {},          // matchId -> { team, members: [{address, amountUnits}], payoutTxHash|null }
+    passes: {},         // passId -> { tier, buyer, issuedAt, expiresAt }
+    queries: [],         // {id, question, answer, payer, at}
+  };
+}
+
+function load() {
+  if (!existsSync(DATA_FILE)) return empty();
+  try {
+    return { ...empty(), ...JSON.parse(readFileSync(DATA_FILE, "utf8")) };
+  } catch {
+    return empty();
+  }
+}
+
+let state = load();
+
+function persist() {
+  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+  writeFileSync(DATA_FILE, JSON.stringify(state, null, 2));
+}
+
+export const store = {
+  recordSettlement(entry) {
+    state.settlements.push({ id: `s_${state.settlements.length + 1}`, at: new Date().toISOString(), ...entry });
+    persist();
+  },
+  addCheer(team, amountUnits) {
+    state.cheers[team] = (state.cheers[team] || 0) + Number(amountUnits);
+    persist();
+  },
+  joinPool(matchId, team, address, amountUnits) {
+    if (!state.pools[matchId]) state.pools[matchId] = { team, members: [], payoutTxHash: null };
+    state.pools[matchId].members.push({ address, amountUnits: Number(amountUnits) });
+    persist();
+  },
+  getPool(matchId) {
+    return state.pools[matchId] || null;
+  },
+  markPoolPaid(matchId, payoutTxHash) {
+    if (state.pools[matchId]) state.pools[matchId].payoutTxHash = payoutTxHash;
+    persist();
+  },
+  addPass(passId, tier, buyer, expiresAt) {
+    state.passes[passId] = { tier, buyer, issuedAt: new Date().toISOString(), expiresAt };
+    persist();
+  },
+  getPass(passId) {
+    return state.passes[passId] || null;
+  },
+  addQuery(question, answer, payer) {
+    state.queries.push({ id: `q_${state.queries.length + 1}`, question, answer, payer, at: new Date().toISOString() });
+    persist();
+  },
+  snapshot() {
+    return state;
+  },
+};
