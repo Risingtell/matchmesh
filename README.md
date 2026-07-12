@@ -1,8 +1,10 @@
 # MatchMesh
 
-**The agent-commerce settlement layer for the 2026 World Cup, on Injective.**
+**Ask a real question about the 2026 World Cup and get an answer settled by a real on-chain payment, in one click, no wallet or signup required.**
 
-Built for the [Injective Global Cup](https://www.hackquest.io/hackathons/The-Injective-Global-Cup) (HackQuest). Instead of shipping one more World Cup app, MatchMesh is the *rails*: a shared MCP + x402 settlement layer any World Cup app or agent can plug into, proven live with three real agents running on top of its own rails, against the actual 2026 tournament in progress right now.
+That single interaction runs on all four of this hackathon's named technologies at once: **x402 · CCTP · MCP Server · Agent Skills.** Not one or two of them for a checkbox, all four, all real, all proven live (see the capability map below), plus autonomous fan-reward payouts and genuine agent-to-agent commerce, running against the actual 2026 tournament in progress right now.
+
+Built for the [Injective Global Cup](https://www.hackquest.io/hackathons/The-Injective-Global-Cup) (HackQuest). Instead of shipping one more World Cup app, MatchMesh is the *rails*: a shared MCP + x402 settlement layer any World Cup app or agent can plug into, proven live with three real agents running on top of its own rails.
 
 > **10 chain-confirmed settlements · 5 live wallets · 4 payment rails · 3 autonomous agents · 1 real CCTP cross-chain bridge**
 > Every number here is independently re-derivable on-chain via `npm run verify`, not read from this app's own database.
