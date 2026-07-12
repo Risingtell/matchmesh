@@ -6,7 +6,7 @@
  * one shared daily cap across both entry points, not two independent risks.
  */
 import { createInjectiveClient, parsePaymentResponseHeader } from "@injectivelabs/x402/client";
-import { checkBudget } from "../mcp/budget-guard.js";
+import { checkBudget, refundBudget } from "../mcp/budget-guard.js";
 import { PRICE } from "./index.js";
 
 function buildOperatorClient() {
@@ -26,8 +26,11 @@ export function mountDemo(app) {
     if (!question || typeof question !== "string" || question.length > 200) {
       return res.status(400).json({ error: "question required (max 200 chars)" });
     }
+    const cost = BigInt(PRICE.query);
+    let reserved = false;
     try {
-      checkBudget(BigInt(PRICE.query));
+      checkBudget(cost);
+      reserved = true;
       const payRes = await operatorClient.fetch(`${railsUrl}/api/pay_per_query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -38,6 +41,9 @@ export function mountDemo(app) {
       if (!payRes.ok) throw new Error(data.error || `pay_per_query failed with ${payRes.status}`);
       res.json({ answer: data.answer, settledTx: receipt?.transaction ?? null, priceUsd: Number(PRICE.query) / 1e6 });
     } catch (err) {
+      // Only refund a reservation we actually made — checkBudget() itself
+      // throwing (cap already exhausted) never reserved anything.
+      if (reserved) refundBudget(cost);
       res.status(502).json({ error: err.message });
     }
   });

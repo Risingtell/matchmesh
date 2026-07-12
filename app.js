@@ -15,6 +15,7 @@ import { mountRails } from "./server/index.js";
 import { mountScout } from "./agents/scout-server.js";
 import { mountMcp } from "./mcp/server.js";
 import { mountDemo } from "./server/demo.js";
+import { tick as tipperTick } from "./agents/tipper.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,3 +31,13 @@ mountDemo(app);
 app.listen(config.port, () => {
   console.log(`MatchMesh listening on :${config.port} (rails + scout + mcp, ${config.network})`);
 });
+
+// Run Tipper's autonomous goal-watch loop IN this process, not just as a
+// script someone happens to run manually. render.yaml only deploys this one
+// web service — without this, "autonomous, no human in the loop" was true
+// of the code but not of the actual live deployment.
+const TIPPER_POLL_MS = Number(process.env.TIPPER_POLL_MS || 15_000);
+console.log(`[tipper] autonomous poller starting (every ${TIPPER_POLL_MS}ms)`);
+setInterval(() => {
+  tipperTick().catch((err) => console.error("[tipper] cycle failed:", err.message));
+}, TIPPER_POLL_MS);

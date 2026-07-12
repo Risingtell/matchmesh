@@ -22,7 +22,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createInjectiveClient, parsePaymentResponseHeader } from "@injectivelabs/x402/client";
 import { PRICE } from "../server/index.js";
-import { checkBudget } from "./budget-guard.js";
+import { checkBudget, refundBudget } from "./budget-guard.js";
 
 const RAILS_URL = process.env.MATCHMESH_URL || `http://localhost:${process.env.PORT || 4021}`;
 
@@ -39,15 +39,22 @@ function buildOperatorClient() {
 
 async function payRails(operatorClient, path, body, costUnits) {
   checkBudget(costUnits);
-  const res = await operatorClient.fetch(`${RAILS_URL}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const receipt = parsePaymentResponseHeader(res);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `${path} failed with ${res.status}`);
-  return { data, receipt };
+  try {
+    const res = await operatorClient.fetch(`${RAILS_URL}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const receipt = parsePaymentResponseHeader(res);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `${path} failed with ${res.status}`);
+    return { data, receipt };
+  } catch (err) {
+    // The reservation in checkBudget() only reflects a real spend once the
+    // call actually succeeds — give it back on any failure.
+    refundBudget(costUnits);
+    throw err;
+  }
 }
 
 function textResult(obj) {

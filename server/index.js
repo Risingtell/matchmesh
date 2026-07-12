@@ -19,8 +19,45 @@ function payerOf(req) {
   return req.x402?.payer || req.headers["x-payer-hint"] || "unknown";
 }
 
+/**
+ * Rejects structurally-invalid paid requests BEFORE the payment middleware
+ * ever runs, so nobody is charged for a request that was always going to
+ * 400. (An earlier attempt used the SDK's settlementPolicy: "after-success"
+ * instead, which only settles post-handler — but that setting's
+ * response-buffering path produces a malformed HTTP response that Node's
+ * own client rejects with "Response does not match the HTTP/1.1 protocol",
+ * confirmed by direct testing. That's a real bug in the vendored
+ * @injectivelabs/x402 dependency, not something to work around by shipping
+ * broken responses. Validating up front sidesteps it entirely and keeps the
+ * known-good settlementPolicy: "before" response path.)
+ */
+function validatePaidBody(req, res, next) {
+  const b = req.body || {};
+  if (req.method === "POST" && req.path === "/api/pay_per_query" && !b.question) {
+    return res.status(400).json({ error: "question required" });
+  }
+  if (req.method === "POST" && req.path === "/api/send_tip" && !b.team) {
+    return res.status(400).json({ error: "team required" });
+  }
+  if (req.method === "POST" && req.path === "/api/join_pool") {
+    if (!b.matchId || !b.team || !b.payoutAddress) {
+      return res.status(400).json({ error: "matchId, team, payoutAddress required" });
+    }
+    if (!/^0x[0-9a-fA-F]{40}$/.test(b.payoutAddress)) {
+      return res.status(400).json({ error: "payoutAddress must be a valid EVM address" });
+    }
+    const existing = store.getPool(b.matchId);
+    if (existing && existing.team !== b.team) {
+      return res.status(400).json({ error: `pool ${b.matchId} is already staked on ${existing.team}, not ${b.team}` });
+    }
+  }
+  next();
+}
+
 /** Mounts the MatchMesh rails (paid + public routes) onto an existing Express app. */
 export function mountRails(app) {
+  app.use(validatePaidBody);
+
   app.use(
     injectivePaymentMiddleware(
       {
@@ -50,7 +87,6 @@ export function mountRails(app) {
 
   app.post("/api/pay_per_query", async (req, res) => {
     const { question } = req.body || {};
-    if (!question) return res.status(400).json({ error: "question required" });
     const answer = await answerQuestion(question);
     const payer = payerOf(req);
     store.addQuery(question, answer, payer);
@@ -60,7 +96,6 @@ export function mountRails(app) {
 
   app.post("/api/send_tip", async (req, res) => {
     const { team } = req.body || {};
-    if (!team) return res.status(400).json({ error: "team required" });
     const payer = payerOf(req);
     store.addCheer(team, PRICE.tip);
     store.recordSettlement({ kind: "send_tip", payer, amount: PRICE.tip, txHash: req.x402?.txHash || null, network: config.network, meta: { team } });
@@ -69,7 +104,6 @@ export function mountRails(app) {
 
   app.post("/api/join_pool", async (req, res) => {
     const { matchId, team, payoutAddress } = req.body || {};
-    if (!matchId || !team || !payoutAddress) return res.status(400).json({ error: "matchId, team, payoutAddress required" });
     const payer = payerOf(req);
     store.joinPool(matchId, team, payoutAddress, PRICE.pool);
     store.recordSettlement({ kind: "join_pool", payer, amount: PRICE.pool, txHash: req.x402?.txHash || null, network: config.network, meta: { matchId, team } });
@@ -135,15 +169,28 @@ export function mountRails(app) {
       const share = Math.floor(total / pool.members.length);
       const results = [];
       for (const member of pool.members) {
+        // A previous attempt may have already paid this member before a
+        // later member's payout threw — skip them instead of paying twice.
+        // Without this check, releasing the claim on failure (below) let a
+        // retry re-run the whole loop from scratch and double-pay everyone
+        // who'd already been sent real USDC before the failure point.
+        if (member.paid) {
+          results.push({ to: member.address, amount: share, hash: member.hash, skipped: true });
+          continue;
+        }
         const { hash } = await payoutUsdc(member.address, BigInt(share));
+        store.markMemberPaid(req.params.matchId, member.address, hash);
         results.push({ to: member.address, amount: share, hash });
       }
-      store.markPoolPaid(req.params.matchId, results[0]?.hash || null);
-      store.recordSettlement({ kind: "pool_payout", payer: "treasury", amount: String(total), txHash: results[0]?.hash || null, network: config.network, meta: { matchId: req.params.matchId, results } });
+      const anyHash = results.find((r) => r.hash)?.hash || null;
+      store.markPoolPaid(req.params.matchId, anyHash);
+      store.recordSettlement({ kind: "pool_payout", payer: "treasury", amount: String(total), txHash: anyHash, network: config.network, meta: { matchId: req.params.matchId, results } });
       res.json({ ok: true, results });
     } catch (err) {
       // Release the claim on failure so a retry is possible instead of the
       // pool being stuck "processing" forever after a transient chain error.
+      // Members already marked paid (above) stay marked paid across the
+      // release, so the retry's skip check prevents double-payment.
       store.markPoolPaid(req.params.matchId, null);
       res.status(500).json({ error: "payout_failed", message: err.message });
     }

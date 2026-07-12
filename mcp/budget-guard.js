@@ -20,3 +20,16 @@ export function checkBudget(costUnits) {
   }
   spentToday += costUnits;
 }
+
+/**
+ * checkBudget() reserves spend optimistically (before the real payment
+ * attempt) so two concurrent requests can't both slip past the cap check.
+ * If the downstream payment attempt then fails (network blip, upstream
+ * down), the reservation must be given back — otherwise a string of
+ * unrelated failures silently exhausts the daily cap with zero real
+ * settlements to show for it.
+ */
+export function refundBudget(costUnits) {
+  spentToday -= costUnits;
+  if (spentToday < 0n) spentToday = 0n;
+}

@@ -2,32 +2,35 @@
 
 **The agent-commerce settlement layer for the 2026 World Cup, on Injective.**
 
-Built for the [Injective Global Cup](https://www.hackquest.io/hackathons/The-Injective-Global-Cup) (HackQuest). Instead of shipping one more World Cup app, MatchMesh is the *rails* — a shared MCP + x402 settlement layer any World Cup app or agent can plug into — proven live with three real agents running on top of its own rails, against the actual 2026 tournament in progress right now.
+Built for the [Injective Global Cup](https://www.hackquest.io/hackathons/The-Injective-Global-Cup) (HackQuest). Instead of shipping one more World Cup app, MatchMesh is the *rails*: a shared MCP + x402 settlement layer any World Cup app or agent can plug into, proven live with three real agents running on top of its own rails, against the actual 2026 tournament in progress right now.
+
+> **10 chain-confirmed settlements · 5 live wallets · 4 payment rails · 3 autonomous agents · 1 real CCTP cross-chain bridge**
+> Every number here is independently re-derivable on-chain via `npm run verify`, not read from this app's own database.
 
 **Live demo:** https://matchmesh.onrender.com
 **Video:** _fill in demo video link_
-**Verify it's real:** `npm run verify` — re-derives every settlement straight from Injective testnet USDC Transfer logs, independent of this app's own database. This is the authoritative proof; the live site's `/api/impact` dashboard reflects its own local ledger and resets on redeploy (Render free-tier disk is ephemeral), but the on-chain settlements themselves are permanent and don't depend on that ledger surviving.
+**Verify it's real:** `npm run verify` re-derives every settlement straight from Injective testnet USDC Transfer logs, independent of this app's own database. This is the authoritative proof; the live site's `/api/impact` dashboard reflects its own local ledger and resets on redeploy (Render free-tier disk is ephemeral), but the on-chain settlements themselves are permanent and don't depend on that ledger surviving.
 
 ## Capability map
 
 | MatchMesh feature | Injective / hackathon-required capability |
 |---|---|
-| `pay_per_query`, `send_tip`, `join_pool`, `buy_pass` rails | `@injectivelabs/x402` — real x402 payments on Injective EVM |
-| MCP tool surface (`ask_worldcup_stat`, `send_cheer`, `join_goal_pool`, `buy_fan_pass`) | MCP Server — any MCP-compatible agent can use the rails with zero wallet setup |
-| `skills/matchmesh/SKILL.md` | Agent Skills — installable via `npx skills add <repo> --skill matchmesh`, same convention as `InjectiveLabs/agent-skills` |
-| `scripts/cctp-bridge.js` | USDC CCTP — real burn-and-mint via Circle's actual TokenMessengerV2/MessageTransmitterV2, Sepolia → Injective testnet. Proven live: [burn](https://sepolia.etherscan.io/tx/0xd648a476aaa92a479aab5eba91d8e20d9648057c63ca2ccd43d7b9d037e0aeac) / [mint](https://testnet.blockscout.injective.network/tx/0x5448ee1f0dde1a94cb8cc377abff7b60cd8c730d06786dc043db255d49ab0053) |
+| `pay_per_query`, `send_tip`, `join_pool`, `buy_pass` rails | `@injectivelabs/x402`: real x402 payments on Injective EVM |
+| MCP tool surface (`ask_worldcup_stat`, `send_cheer`, `join_goal_pool`, `buy_fan_pass`) | MCP Server: any MCP-compatible agent can use the rails with zero wallet setup |
+| `skills/matchmesh/SKILL.md` | Agent Skills: installable via `npx skills add <repo> --skill matchmesh`, same convention as `InjectiveLabs/agent-skills` |
+| `scripts/cctp-bridge.js` | USDC CCTP: real burn-and-mint via Circle's actual TokenMessengerV2/MessageTransmitterV2, Sepolia to Injective testnet. Proven live: [burn](https://sepolia.etherscan.io/tx/0xd648a476aaa92a479aab5eba91d8e20d9648057c63ca2ccd43d7b9d037e0aeac) / [mint](https://testnet.blockscout.injective.network/tx/0x5448ee1f0dde1a94cb8cc377abff7b60cd8c730d06786dc043db255d49ab0053) |
 | Scout microservice paid by other agents, not humans | Agent-to-agent commerce, not just human-to-agent |
-| `npm run verify` | On-chain proof — don't trust the numbers, re-derive them |
+| `npm run verify` | On-chain proof: don't trust the numbers, re-derive them |
 
 ## Why rails, not another app
 
-Every judging criterion on the hackathon page rewards this directly. *"Future contribution potential"* can't be scored by a one-off app — but infrastructure other builders can adopt after the event can. *"New Injective technology utilization"* is the actual product here, not a bolted-on requirement. Three real agents prove the rails aren't a spec doc:
+Every judging criterion on the hackathon page rewards this directly. *"Future contribution potential"* can't be scored by a one-off app, but infrastructure other builders can adopt after the event can. *"New Injective technology utilization"* is the actual product here, not a bolted-on requirement. Three real agents prove the rails aren't a spec doc:
 
-1. **StatCaster** (`agents/statcaster.js`) — pays $0.001 per plain-English answer about a live match.
-2. **Scout** (`agents/scout-server.js` + `agents/scout.js`) — an independently-payable microservice other agents hire for structured match data ($0.0005), demonstrating agent-to-agent commerce, not just human-to-agent.
-3. **Tipper** (`agents/tipper.js`) — autonomously watches live scores and triggers a goal-reward-pool payout the instant a goal is scored, no human in the loop. Logs its reasoning every poll cycle.
+1. **StatCaster** (`agents/statcaster.js`): pays $0.001 per plain-English answer about a live match.
+2. **Scout** (`agents/scout-server.js` + `agents/scout.js`): an independently-payable microservice other agents hire for structured match data ($0.0005), demonstrating agent-to-agent commerce, not just human-to-agent.
+3. **Tipper** (`agents/tipper.js`): autonomously watches live scores and triggers a goal-reward-pool payout the instant a goal is scored, no human in the loop. Logs its reasoning every poll cycle.
 
-All three run against **real, live 2026 World Cup data** (worldcup26.ir — verified live, not mocked) and settle real USDC on Injective EVM testnet.
+All three run against **real, live 2026 World Cup data** (worldcup26.ir, verified live, not mocked) and settle real USDC on Injective EVM testnet.
 
 ## Architecture
 
@@ -50,7 +53,7 @@ npm install
 npm run genkeys      # generates treasury + 4 agent wallets (gitignored)
 node scripts/build-env.js   # writes .env from the generated keys
 # fund: faucet.circle.com (testnet USDC, Injective Testnet) for treasury/agent-scout (gas)
-#       + agent-statcaster/mcp-operator (USDC) — see JUDGE-QUICKSTART.md for exactly which wallet needs what
+#       + agent-statcaster/mcp-operator (USDC); see JUDGE-QUICKSTART.md for exactly which wallet needs what
 
 npm start              # everything on one port: rails + Scout + MCP + dashboard (:4021, or $PORT)
 # or run them separately for local dev:
@@ -67,11 +70,11 @@ npm run verify         # on-chain proof, independent of the app's own database
 npm run balances       # check every wallet's INJ/USDC balance
 ```
 
-Deploys as a single Render web service (see `render.yaml`) — `npm start` runs `app.js`, which mounts the rails, Scout, and MCP server on one Express app/port and serves the landing page + live dashboard from `public/`.
+Deploys as a single Render web service (see `render.yaml`). `npm start` runs `app.js`, which mounts the rails, Scout, and MCP server on one Express app/port and serves the landing page + live dashboard from `public/`.
 
 ## Tech
 
-Injective EVM testnet (`eip155:1439`), `@injectivelabs/x402` (real x402 middleware/client/facilitator — not hand-rolled), native Circle USDC (`0x0C382e685bbeeFE5d3d9C29e29E341fEE8E84C5d`, EIP-3009), `@modelcontextprotocol/sdk` (Streamable HTTP transport, stateless), viem, Express.
+Injective EVM testnet (`eip155:1439`), `@injectivelabs/x402` (real x402 middleware/client/facilitator, not hand-rolled), native Circle USDC (`0x0C382e685bbeeFE5d3d9C29e29E341fEE8E84C5d`, EIP-3009), `@modelcontextprotocol/sdk` (Streamable HTTP transport, stateless), viem, Express.
 
 ## License
 

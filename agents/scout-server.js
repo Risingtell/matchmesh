@@ -18,6 +18,17 @@ const SCOUT_KEY = process.env.SCOUT_PRIVATE_KEY;
 const RPC_URL = process.env.RPC_URL;
 
 export function mountScout(app) {
+  // Reject a missing `team` before the payment middleware runs, so a
+  // malformed request never gets charged. (Not using settlementPolicy:
+  // "after-success" here — see the comment in server/index.js on why that
+  // SDK option's response-buffering path produces malformed HTTP responses.)
+  app.use((req, res, next) => {
+    if (req.method === "POST" && req.path === "/scout/lookup" && !(req.body || {}).team) {
+      return res.status(400).json({ error: "team required" });
+    }
+    next();
+  });
+
   app.use(
     injectivePaymentMiddleware(
       {
@@ -32,7 +43,6 @@ export function mountScout(app) {
 
   app.post("/scout/lookup", async (req, res) => {
     const { team } = req.body || {};
-    if (!team) return res.status(400).json({ error: "team required" });
     const matches = await lookupTeamMatches(team);
     res.json({ team, matches, hiredBy: req.x402?.payer || "unknown" });
   });

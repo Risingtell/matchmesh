@@ -40,7 +40,7 @@ export const store = {
   },
   joinPool(matchId, team, address, amountUnits) {
     if (!state.pools[matchId]) state.pools[matchId] = { team, members: [], payoutTxHash: null };
-    state.pools[matchId].members.push({ address, amountUnits: Number(amountUnits) });
+    state.pools[matchId].members.push({ address, amountUnits: Number(amountUnits), paid: false, hash: null });
     persist();
   },
   getPool(matchId) {
@@ -49,6 +49,22 @@ export const store = {
   markPoolPaid(matchId, payoutTxHash) {
     if (state.pools[matchId]) state.pools[matchId].payoutTxHash = payoutTxHash;
     persist();
+  },
+  /**
+   * Marks one member as paid the moment their individual payout confirms,
+   * independent of whether the rest of the loop later succeeds or throws.
+   * This is what makes a retry after a partial failure safe: a retry skips
+   * members already marked paid instead of re-sending them real USDC.
+   */
+  markMemberPaid(matchId, address, hash) {
+    const pool = state.pools[matchId];
+    if (!pool) return;
+    const member = pool.members.find((m) => m.address === address && !m.paid);
+    if (member) {
+      member.paid = true;
+      member.hash = hash;
+      persist();
+    }
   },
   /**
    * Synchronously claims the right to pay out a pool, before any await runs.
