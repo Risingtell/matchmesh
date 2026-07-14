@@ -10,7 +10,7 @@ Built for the [Injective Global Cup](https://www.hackquest.io/hackathons/The-Inj
 > Every number here is independently re-derivable on-chain via `npm run verify`, not read from this app's own database.
 
 **Live demo:** https://matchmesh.onrender.com
-**Video:** _fill in demo video link_
+**Video:** https://youtu.be/9qvnekNWHTw
 **Verify it's real:** `npm run verify` re-derives every settlement straight from Injective testnet USDC Transfer logs, independent of this app's own database. This is the authoritative proof; the live site's `/api/impact` dashboard reflects its own local ledger and resets on redeploy (Render free-tier disk is ephemeral), but the on-chain settlements themselves are permanent and don't depend on that ledger surviving.
 
 ## Capability map
